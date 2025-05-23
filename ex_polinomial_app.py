@@ -11,94 +11,168 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd # Para facilitar a manipulação dos pontos do usuário
+
+def calculate_polynomial_coefficients(x_data, y_data, degree):
+    """
+    Calcula os coeficientes do polinômio de grau 'degree' usando Mínimos Quadrados.
+    Retorna os coeficientes (A, B, C, D, ...) ou None em caso de erro.
+    """
+    if len(x_data) != len(y_data) or len(x_data) < (degree + 1):
+        st.error(f"Número de pontos insuficiente para um polinômio de grau {degree}. Você precisa de pelo menos {degree + 1} pontos.")
+        return None
+
+    # Construção da Matriz de Design (Matriz X) para um grau genérico
+    # Colunas: x^degree, x^(degree-1), ..., x^1, x^0 (constante)
+    X = np.vstack([x_data**(degree - i) for i in range(degree + 1)]).T
+
+    try:
+        # Fórmula: beta = (X.T @ X)^-1 @ X.T @ y
+        coefs = np.linalg.inv(X.T @ X) @ X.T @ y_data
+        return coefs
+    except np.linalg.LinAlgError:
+        st.error("Erro: Não foi possível calcular a inversa da matriz (X.T @ X). "
+                 "Isso pode acontecer se os pontos forem colineares para o grau escolhido "
+                 "ou se houver pontos duplicados, resultando em uma matriz singular. "
+                 "Tente ajustar os pontos ou o grau do polinômio.")
+        return None
+    except Exception as e:
+        st.error(f"Ocorreu um erro no cálculo dos coeficientes: {e}")
+        return None
 
 def main():
-    st.set_page_config(page_title="Ajuste de Polinômio Cúbico com MMQ", layout="centered")
+    st.set_page_config(page_title="Ajuste de Polinômio Interativo", layout="centered")
 
-    st.title("Polinômio Cúbico por Mínimos Quadrados (MMQ)")
+    st.title("Ajuste de Polinômio Interativo por Mínimos Quadrados")
     st.markdown("""
-    Esta aplicação demonstra o ajuste de um polinômio cúbico
-    ($AX^3 + BX^2 + CX + D$) aos pontos fornecidos, utilizando o
-    Método dos Mínimos Quadrados (MMQ).
+    Ajuste um polinômio de grau $N$ aos seus próprios pontos $(x, y)$ utilizando
+    o Método dos Mínimos Quadrados (MMQ).
     """)
 
-    st.header("Pontos Fornecidos")
-    st.markdown("""
-    Os pontos utilizados para o ajuste são:
-    * **Ponto 1:** $(-1, -10)$
-    * **Ponto 2:** $(0, 5)$
-    * **Ponto 3:** $(1, 6)$
-    * **Ponto 4:** $(2, 11)$
-    * **Ponto 5:** $(3, 42)$
+    st.sidebar.header("Configurações do Polinômio")
+
+    # Opção para o usuário ajustar o grau do polinômio
+    polynomial_degree = st.sidebar.slider(
+        "Selecione o Grau do Polinômio:",
+        min_value=1,
+        max_value=5, # Limite o grau para evitar over-fitting ou problemas de cálculo com poucos pontos
+        value=3,     # Grau cúbico como padrão
+        step=1
+    )
+
+    st.sidebar.subheader("Entrada de Pontos")
+    st.sidebar.markdown("""
+    Insira seus pontos $(x, y)$ no formato `x,y` por linha.
+    Exemplo:
+    ```
+    -1,-10
+    0,5
+    1,6
+    2,11
+    3,42
+    ```
     """)
 
-    # 1. Preparação dos Dados
-    x_pontos = np.array([-1, 0, 1, 2, 3])
-    y_pontos = np.array([-10, 5, 6, 11, 42])
+    # Campo de texto para o usuário inserir os pontos
+    default_points_str = "-1,-10\n0,5\n1,6\n2,11\n3,42"
+    user_input_points = st.sidebar.text_area("Seus Pontos (x,y por linha):", value=default_points_str, height=150)
 
-    st.subheader("Dados em Array NumPy:")
-    st.write(f"**Valores de X:** {x_pontos}")
-    st.write(f"**Valores de Y:** {y_pontos}")
+    # Processar a entrada do usuário
+    x_coords = []
+    y_coords = []
+    points_df = pd.DataFrame(columns=["x", "y"])
 
-    st.header("Cálculo dos Coeficientes")
+    for line in user_input_points.split('\n'):
+        line = line.strip()
+        if line: # Garante que a linha não está vazia
+            try:
+                x_str, y_str = line.split(',')
+                x_coords.append(float(x_str))
+                y_coords.append(float(y_str))
+            except ValueError:
+                st.sidebar.error(f"Formato inválido na linha: '{line}'. Use 'x,y'.")
+                return # Interrompe a execução para que o usuário corrija
 
-    # 2. Construção da Matriz de Design (Matriz X)
-    X = np.vstack([x_pontos**3, x_pontos**2, x_pontos**1, np.ones(len(x_pontos))]).T
+    if not x_coords or not y_coords:
+        st.warning("Por favor, insira pelo menos um ponto para começar.")
+        return
 
-    st.subheader("Matriz de Design (X):")
-    st.dataframe(X) # st.dataframe exibe DataFrames ou arrays de forma elegante
+    # Converte para arrays NumPy
+    x_data = np.array(x_coords)
+    y_data = np.array(y_coords)
 
-    # 3. Cálculo dos Coeficientes (A, B, C, D) usando Mínimos Quadrados
-    try:
-        X_transposto_X = X.T @ X
-        X_transposto_X_inv = np.linalg.inv(X_transposto_X)
-        X_transposto_y = X.T @ y_pontos
-        coeficientes = X_transposto_X_inv @ X_transposto_y
+    st.header("Pontos Utilizados na Análise")
+    # Cria um DataFrame para exibir os pontos de forma organizada
+    points_df = pd.DataFrame({'X': x_data, 'Y': y_data})
+    st.dataframe(points_df)
 
-        A, B, C, D = coeficientes
+    if len(x_data) < (polynomial_degree + 1):
+        st.warning(f"Você precisa de pelo menos **{polynomial_degree + 1}** pontos para ajustar um polinômio de grau **{polynomial_degree}**.")
+        st.warning("Aumente o número de pontos ou diminua o grau do polinômio.")
+        return
 
-        st.subheader("Coeficientes do Polinômio Cúbico:")
-        st.write(f"**A (coeficiente de $x^3$):** `{A:.4f}`")
-        st.write(f"**B (coeficiente de $x^2$):** `{B:.4f}`")
-        st.write(f"**C (coeficiente de $x$):** `{C:.4f}`")
-        st.write(f"**D (coeficiente constante):** `{D:.4f}`")
+    st.header(f"Cálculo para Polinômio de Grau {polynomial_degree}")
 
-        st.markdown(f"""
-        Portanto, o polinômio cúbico ajustado é:
-        $$ Y = {A:.4f}X^3 + {B:.4f}X^2 + {C:.4f}X + {D:.4f} $$
-        """)
+    # Chama a função para calcular os coeficientes
+    coeficientes = calculate_polynomial_coefficients(x_data, y_data, polynomial_degree)
+
+    if coeficientes is not None:
+        st.subheader("Coeficientes do Polinômio:")
+        coef_labels = [f"$C_{{{i}}}$ (de $x^{{{polynomial_degree - i}}}$)" for i in range(polynomial_degree + 1)]
+        for i, coef in enumerate(coeficientes):
+            st.write(f"{coef_labels[i]}: `{coef:.4f}`")
+
+        # Constrói a equação do polinômio para exibição
+        equation_terms = []
+        for i, coef in enumerate(coeficientes):
+            power = polynomial_degree - i
+            term = f"{coef:.4f}x^{power}" if power > 1 else (f"{coef:.4f}x" if power == 1 else f"{coef:.4f}")
+            if coef >= 0 and i > 0: # Adiciona o '+' se não for o primeiro termo e for positivo
+                equation_terms.append(f"+ {term}")
+            else:
+                equation_terms.append(term)
+        polynomial_equation = "Y = " + " ".join(equation_terms)
+        st.latex(polynomial_equation.replace('x^0', '')) # Remove x^0 para o termo constante
 
         # 4. Geração dos Pontos do Polinômio para Plotagem
-        x_plot = np.linspace(min(x_pontos) - 0.5, max(x_pontos) + 0.5, 100)
-        y_polinomio = A * x_plot**3 + B * x_plot**2 + C * x_plot + D
+        # Gera mais pontos para uma curva suave, abrangendo o intervalo dos pontos do usuário
+        x_plot = np.linspace(min(x_data) - 0.5, max(x_data) + 0.5, 200) # 200 pontos para mais suavidade
+        y_polinomio = np.zeros_like(x_plot)
+        for i, coef in enumerate(coeficientes):
+            y_polinomio += coef * x_plot**(polynomial_degree - i)
 
         st.header("Visualização do Ajuste")
 
-        # Configura o estilo do Seaborn para um visual mais agradável
-        sns.set_theme(style="whitegrid")
+        # Configurações de visualização com Seaborn e Matplotlib
+        sns.set_theme(style="whitegrid", palette="viridis") # Mude a paleta para "viridis", "plasma", "magma" etc.
 
-        fig, ax = plt.subplots(figsize=(10, 6)) # Cria uma figura e um eixo para o Matplotlib
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-        # Plota os pontos originais com Seaborn
-        sns.scatterplot(x=x_pontos, y=y_pontos, s=200, color='red', label='Pontos Originais', zorder=5, ax=ax)
+        # Plota os pontos originais
+        sns.scatterplot(x=x_data, y=y_data, s=150, color='red', edgecolor='black', label='Pontos Originais', zorder=5, ax=ax)
 
         # Plota o polinômio cúbico ajustado
-        sns.lineplot(x=x_plot, y=y_polinomio, color='blue', linewidth=2.5, label=f'Polinômio: {A:.2f}x³ + {B:.2f}x² + {C:.2f}x + {D:.2f}', ax=ax)
+        sns.lineplot(x=x_plot, y=y_polinomio, color='blue', linewidth=3, label=f'Polinômio (Grau {polynomial_degree})', ax=ax)
 
-        ax.set_title('Ajuste de Polinômio Cúbico (Mínimos Quadrados)', fontsize=16)
-        ax.set_xlabel('Eixo X', fontsize=12)
-        ax.set_ylabel('Eixo Y', fontsize=12)
-        ax.legend(fontsize=10)
-        ax.axhline(0, color='gray', linewidth=0.5)
-        ax.axvline(0, color='gray', linewidth=0.5)
+        ax.set_title(f'Ajuste de Polinômio de Grau {polynomial_degree} aos Pontos', fontsize=18, fontweight='bold')
+        ax.set_xlabel('Eixo X', fontsize=14)
+        ax.set_ylabel('Eixo Y', fontsize=14)
+        ax.legend(fontsize=12, loc='best') # 'best' tenta encontrar o melhor lugar para a legenda
+
+        # Adiciona linhas de referência nos eixos X e Y
+        ax.axhline(0, color='gray', linestyle='--', linewidth=0.7)
+        ax.axvline(0, color='gray', linestyle='--', linewidth=0.7)
+
+        # Ajusta os limites dos eixos para melhor visualização (opcional)
+        # ax.set_xlim(min(x_plot), max(x_plot))
+        # ax.set_ylim(min(y_polinomio.min(), y_data.min()) - 5, max(y_polinomio.max(), y_data.max()) + 5)
+
+
+        # Adiciona um "tooltip" ou anotações (opcional, mais avançado e talvez precise de plotly/altair)
+        # Por enquanto, o Matplotlib não tem tooltips nativos.
 
         st.pyplot(fig) # Exibe o gráfico no Streamlit
 
-    except np.linalg.LinAlgError:
-        st.error("Erro: Não foi possível calcular a inversa da matriz (X.T @ X). Isso pode acontecer se a matriz for singular, o que significa que não há uma solução única para o problema.")
-    except Exception as e:
-        st.error(f"Ocorreu um erro: {e}")
-
+    # Rodar a função principal
 if __name__ == "__main__":
     main()
-
