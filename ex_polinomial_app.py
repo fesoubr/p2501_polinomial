@@ -163,15 +163,14 @@ def main():
         ax.axhline(0, color='gray', linestyle='--', linewidth=0.7)
         ax.axvline(0, color='gray', linestyle='--', linewidth=0.7)
 
-        # Ajusta os limites dos eixos para melhor visualização (opcional)
-        # ax.set_xlim(min(x_plot), max(x_plot))
-        # ax.set_ylim(min(y_polinomio.min(), y_data.min()) - 5, max(y_polinomio.max(), y_data.max()) + 5)
-
-
-        # Adiciona um "tooltip" ou anotações (opcional, mais avançado e talvez precise de plotly/altair)
-        # Por enquanto, o Matplotlib não tem tooltips nativos.
-
+       
         st.pyplot(fig) # Exibe o gráfico no Streamlit
+
+         st.markdown("""
+        Este aplicativo serve como uma prova de conceito para visualizar a equaçao do polinômio de grau N.
+        Principais funcionalidades e tecnologias utilizadas: Python, Pandas, Altair
+
+    """)
 
     # Rodar a função principal
 if __name__ == "__main__":
