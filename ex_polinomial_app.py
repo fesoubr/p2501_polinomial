@@ -166,9 +166,9 @@ def main():
        
         st.pyplot(fig) # Exibe o gráfico no Streamlit
 
-         st.markdown("""
-        Este aplicativo serve como uma prova de conceito para visualizar a equaçao do polinômio de grau N.
-        Principais funcionalidades e tecnologias utilizadas: Python, Pandas, Altair
+    st.markdown("""
+    Este aplicativo serve como uma prova de conceito para visualizar a equaçao do polinômio de grau N.
+    Principais funcionalidades e tecnologias utilizadas: Python, Pandas, Altair
 
     """)
 
